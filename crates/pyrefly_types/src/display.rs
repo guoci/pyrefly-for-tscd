@@ -586,7 +586,12 @@ impl<'a> TypeDisplayContext<'a> {
                         self.fmt_helper_generic(t, false, o)
                     })
                 } else {
-                    c.fmt_with_type(output, &|t, o| self.fmt_helper_generic(t, false, o))
+                    // [TypedCPythonDocs] Use Callable[[...], Ret] syntax
+                    c.fmt_with_type_impl(
+                        output,
+                        &|t, o| self.fmt_helper_generic(t, false, o),
+                        !is_toplevel,
+                    )
                 }
             }
             Type::Function(box Function {
@@ -1065,9 +1070,18 @@ impl<'a> TypeDisplayContext<'a> {
                 self.fmt_helper_generic(ty, false, output)?;
                 output.write_str("]")
             }
+            // [TypedCPythonDocs] Sphinx cannot handle the `*Type` syntax, so we use `Unpack[Type]`
+            /*
+                       Type::Unpack(ty) => {
+                           output.write_str("*")?;
+                           self.fmt_helper_generic(ty, false, output)
+                       }
+            */
             Type::Unpack(ty) => {
-                output.write_str("*")?;
-                self.fmt_helper_generic(ty, false, output)
+                self.maybe_fmt_with_module("typing", "Unpack", output)?;
+                output.write_str("[")?;
+                self.fmt_helper_generic(ty, false, output)?;
+                output.write_str("]")
             }
             Type::Concatenate(args, pspec) => {
                 self.maybe_fmt_with_module("typing", "Concatenate", output)?;
@@ -1261,6 +1275,8 @@ impl Type {
         mode: LspDisplayMode,
     ) -> String {
         let mut c = TypeDisplayContext::new(&[self]);
+        // [TypedCPythonDocs] display full module names
+        c.always_display_module_name();
         c.set_lsp_display_mode(mode);
         let rendered = c.display(self).to_string();
         if let Some(name) = fallback_name

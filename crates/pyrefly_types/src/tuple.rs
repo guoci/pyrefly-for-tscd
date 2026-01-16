@@ -95,7 +95,10 @@ impl Tuple {
                 if !prefix.is_empty() {
                     output.write_str(", ")?;
                 }
-                output.write_str("*")?;
+                // output.write_str("*")?;
+                // [TypedCPythonDocs]
+                // for Sphinx compatibility, use typing.Unpack
+                output.write_str("Unpack[")?;
                 write_type(unpacked, output)?;
                 if !suffix.is_empty() {
                     output.write_str(", ")?;
@@ -106,6 +109,7 @@ impl Tuple {
                         write_type(ty, output)?;
                     }
                 }
+                output.write_str("]")?;
             }
         }
         output.write_str("]")

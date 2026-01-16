@@ -726,23 +726,52 @@ impl Callable {
         output: &mut O,
         write_type: &impl Fn(&Type, &mut O) -> fmt::Result,
     ) -> fmt::Result {
+        self.fmt_with_type_impl(output, write_type, false)
+    }
+    pub fn fmt_with_type_impl<O: TypeOutput>(
+        &self,
+        output: &mut O,
+        write_type: &impl Fn(&Type, &mut O) -> fmt::Result,
+        typing_callable_style: bool,
+    ) -> fmt::Result {
         match &self.params {
             Params::List(params) => {
-                output.write_str("(")?;
-                params.fmt_with_type(output, write_type)?;
-                output.write_str(") -> ")?;
-                write_type(&self.ret, output)
+                if typing_callable_style {
+                    // [TypedCPythonDocs] Use Callable[[...], Ret] syntax
+                    output.write_str("collections.abc.Callable[[")?;
+                    params.fmt_with_type(output, write_type)?;
+                    output.write_str("], ")?;
+                    write_type(&self.ret, output)?;
+                    output.write_str("]")
+                } else {
+                    output.write_str("(")?;
+                    params.fmt_with_type(output, write_type)?;
+                    output.write_str(") -> ")?;
+                    write_type(&self.ret, output)
+                }
             }
             Params::Ellipsis => {
-                output.write_str("(...) -> ")?;
-                write_type(&self.ret, output)
+                if typing_callable_style {
+                    // [TypedCPythonDocs] Use Callable[[...], Ret] syntax
+                    output.write_str("collections.abc.Callable[[...], ")?;
+                    write_type(&self.ret, output)?;
+                    output.write_str("]")
+                } else {
+                    output.write_str("(...) -> ")?;
+                    write_type(&self.ret, output)
+                }
             }
             Params::Materialization => {
                 output.write_str("(Materialization) -> ")?;
                 write_type(&self.ret, output)
             }
             Params::ParamSpec(args, pspec) => {
-                output.write_str("(")?;
+                if typing_callable_style {
+                    // [TypedCPythonDocs] Use Callable[[...], Ret] syntax
+                    output.write_str("collections.abc.Callable[[")?;
+                } else {
+                    output.write_str("(")?;
+                }
                 for (i, arg) in args.iter().enumerate() {
                     if i > 0 {
                         output.write_str(", ")?;
@@ -771,8 +800,17 @@ impl Callable {
                         output.write_str(")")?;
                     }
                 }
-                output.write_str(") -> ")?;
-                write_type(&self.ret, output)
+                if typing_callable_style {
+                    output.write_str("], ")?;
+                } else {
+                    output.write_str(") -> ")?;
+                }
+                write_type(&self.ret, output)?;
+                if typing_callable_style {
+                    output.write_str("]")
+                } else {
+                    Ok(())
+                }
             }
         }
     }
